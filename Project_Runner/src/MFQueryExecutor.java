@@ -1,13 +1,14 @@
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
-
 
 public class MFQueryExecutor {
 
-    private HashMap<String, MFStruct> mftable;
+    private HashMap<java.lang.String, MFStruct> mftable;
     private final static String usr = "postgres";
     private final static String pwd = "anycolor92";
     private final static String url = "jdbc:postgresql://localhost:5432/postgres";
@@ -36,42 +37,211 @@ public class MFQueryExecutor {
 
     private void retrieve() {
         try {
-            Connection con = DriverManager.getConnection(url, usr, pwd);    //connect to the database using the password and username
-            System.out.println("Success connecting server!");
-            ResultSet rs;                    //resultset object gets the set of values retreived from the database
+            Connection con = DriverManager.getConnection(url, usr, pwd);
+            ResultSet rs;
+            Statement st = con.createStatement();
             boolean more;
-            Statement st = con.createStatement();   //statement created to execute the query
             
             String ret = "select * from sales";
             rs = st.executeQuery(ret);              //executing the query 
             more=rs.next();                         //checking if more rows available
+            int numScans = 3;
+            int scan = 0;
 
-        while (more) {
-            int quant = rs.getInt(7);
-            String state = rs.getString(6);
-            int month = rs.getInt(4);
-            int year = rs.getInt(5);
-            int day = rs.getInt(3);
-            String prod = rs.getString(2);
-            String cust = rs.getString(1);
-            if ((!mftable.get(prod_cust))) {
-                mftable.put(prod_cust, new MFStruct(cust,prod,sum));
+            while (more && scan < numScans) {
+                HashMap<String, Integer> intVals = new HashMap<String, Integer>();
+                int quant = rs.getInt(7);
+                intVals.put("quant", quant);
+                String state = rs.getString(6);
+                int month = rs.getInt(4);
+                intVals.put("month", month);
+                int year = rs.getInt(5);
+                intVals.put("year", year);
+                int day = rs.getInt(3);
+                intVals.put("day", day);
+                String prod = rs.getString(2);
+                String cust = rs.getString(1);
+
+                String [] aggregates = {"max_quant","avg_quant_1"};
+
+                //Initialize total MFStruct for the grouping
+                if ((mftable.get(cust+"_"+prod) == null)) {
+                    mftable.put(cust+"_"+prod, new MFStruct(cust,prod,aggregates,numScans));
+                }
+
+                if(scan == 0)
+                {
+                    MFStruct curStruct = mftable.get(cust+"_"+prod);
+                    GroupingVariable curVariable = curStruct.groupVars[0];
+
+                    if(curVariable.used)
+                    {
+                        initGroupingVariable(curVariable, intVals);
+                        
+                        curVariable.count++;
+                        aggregateGroupingVariable(curVariable, intVals);
+                    }
+                }
+                else
+                {
+                   for (MFStruct curStruct : mftable.values()) 
+                    {
+                        if(true)//conditions on curStruct
+                        {
+                            GroupingVariable curVariable = curStruct.groupVars[scan];
+                            initGroupingVariable(curVariable, intVals);
+
+                            curVariable.count++;
+                            aggregateGroupingVariable(curVariable, intVals);
+                        }
+                    } 
+                }
+
+                more = rs.next();
+                if(!more)
+                {
+                    //Reset result set to beginning
+                    more = rs.first();
+                    more = rs.next();
+                    scan++;
+                }
             }
+            //TODO: call function to output results
+            outputResults();
+            
+        } catch (SQLException _x) {
+            System.out.println("Connection URL or username or password errors!");
+        _x.printStackTrace();
+
+        }
+    }
+
+    public void initGroupingVariable(GroupingVariable curVariable, HashMap<String, Integer> intVals)
+    {
+        if (curVariable.initialized == false)
+        {
+            for (String key : curVariable.aggMap.keySet()) 
+            {
+                String[] split = key.split("_");
+                switch(split[0])
+                {
+                    case max:
+                    case min:
+                        curVariable.aggMap.put(key, intVals.get(split[1]));
+                        break;
+                    default:
+                        curVariable.aggMap.put(key, 0);
+                        break;
+                }
+            }
+            curVariable.initialized = true;
+        }
+    }
+
+    public void aggregateGroupingVariable(GroupingVariable curVariable, HashMap<String, Integer> intVals)
+    {
+        for (Map.Entry<String, AtomicInteger> entry : curVariable.aggMap.entrySet()) 
+        {
+            String key = entry.getKey();
+            AtomicInteger value = entry.getValue();
+            String[] split = key.split("_");
+            switch(split[0])
+            {
+                case max:
+                    if(intVals.get(split[1]).intValue() >= value)
+                        value.set(intVals.get(split[1]).intValue());
+                    break;
+                case min:
+                    if(intVals.get(split[1]).intValue() <= value)
+                        value.set(intVals.get(split[1]).intValue());
+                    break;
+                case sum:
+                    value.addAndGet(intVals.get(split[1]).intValue());
+                    break;
+                case avg:
+                    int prevSum = value.get() * (curVariable.count - 1);
+                    int newAvg = (prevSum + intVals.get(split[1]).intValue()) / curVariable.count;
+                    break;
+            }
+        }
+    }
+    
+    //TODO: create this function
+    public void outputResults()
+    {
+    	//TODO: print column headers
+    	
+    	for(MFStruct curStruct : mftable.values())
+    	{	
+    		if(true) //TODO: test having conditions here
+    		{
+    			//TODO: print results here
+    		}
+    	}
+    }
+
+    public class GroupingVariable {
+        public HashMap<String, AtomicInteger> aggMap;
+        public boolean initialized;
+        public boolean used;
+        public int count;
+
+        public GroupingVariable()
+        {
+            count = 0;
+            initialized = false;
+            used = false;
+            aggMap = new HashMap<String, AtomicInteger>();
+        }
+
+        public void addAggregate(String agg)
+        {
+            if(this.used == false)
+            {
+                this.used == true;
+            }
+            aggMap.put(agg, new AtomicInteger());
         }
     }
 
     public class MFStruct {
+        //These are grouping attributes
+        public String cust;
+        public String prod;
 
-        private String cust;
-        private String prod;
-        private int sum;
+        public GroupingVariable [] groupVars;
 
-        public MFStruct(String cust, String prod, int sum) {
+        private String[] aggregateFunctions;
+
+        public MFStruct(String cust, String prod, String[] aggFcns, int numGroupVars) 
+        {
             this.cust = cust;
             this.prod = prod;
-            this.sum = sum;
+            this.aggregateFunctions = aggFcns;
+            groupVars = new GroupingVariable[numGroupVars+1];
+            for(int i = 0; i < groupVars.length; i++)
+            {
+                groupVars[i] = new GroupingVariable();
+            }
+            initStruct();
         }
 
+        private void initStruct() 
+        {
+            for(int i = 0; i < aggregateFunctions.length; i++)
+            {
+                String[] split = aggregateFunctions[i].split("_");
+                switch(split.length)
+                {
+                    case 2:
+                        groupVars[0].addAggregate(split[0]+"_"+split[1]);
+                        break;
+                    case 3:
+                        groupVars[split[2]].addAggregate(split[0]+"_"+split[1]);
+                        break;
+                }
+            }
+        }
     }
 
 }

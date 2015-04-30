@@ -152,7 +152,7 @@ public class InputParser {
 		return result;
 	}
 	
-	public boolean isAggregate(String str)
+	public static boolean isAggregate(String str)
 	{
 		String[] split = str.split("_");
 		if(split.length >= 2)
@@ -166,14 +166,34 @@ public class InputParser {
 	{
 		for(int i = 0; i < this.S.length; i++)
 		{
-			if(isAggregate(this.S[i]))
+			if(isAggregate(this.S[i]) && !aggregateFunctions.contains(this.S[i]))
 			{
 				aggregateFunctions.add(this.S[i]);
 			}
 		}
 		for(int i = 0; i < this.F.length; i++)
 		{
-			aggregateFunctions.add(this.F[i]);
+			if(!aggregateFunctions.contains(this.F[i]))
+			{
+				aggregateFunctions.add(this.F[i]);
+			}
+		}
+		for(int i = 0; i < sigma.length; i++)
+		{
+			for(int j = 0; j < sigma[i].aggregateFunctions.size(); j++)
+			{
+				if(!aggregateFunctions.contains(sigma[i].aggregateFunctions.get(j)))
+				{
+					aggregateFunctions.add(sigma[i].aggregateFunctions.get(j));
+				}
+			}
+		}
+		for(int i = 0; i < G.aggregateFunctions.size(); i++)
+		{
+			if(!aggregateFunctions.contains(G.aggregateFunctions.get(i)))
+			{
+				aggregateFunctions.add(G.aggregateFunctions.get(i));
+			}
 		}
 	}
 

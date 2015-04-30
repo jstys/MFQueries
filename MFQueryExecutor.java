@@ -3,8 +3,9 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MFQueryExecutor {
 
@@ -62,21 +63,25 @@ public class MFQueryExecutor {
                 String prod = rs.getString(2);
                 String cust = rs.getString(1);
 
-                String [] aggregates = ["max_quant","avg_quant_1"];
+                String [] aggregates = {"max_quant","avg_quant_1"};
 
                 //Initialize total MFStruct for the grouping
                 if ((mftable.get(cust+"_"+prod) == null)) {
                     mftable.put(cust+"_"+prod, new MFStruct(cust,prod,aggregates,numScans));
                 }
 
-                if(scan == 0 && curVariable.used)
+                if(scan == 0)
                 {
                     MFStruct curStruct = mftable.get(cust+"_"+prod);
                     GroupingVariable curVariable = curStruct.groupVars[0];
-                    initGroupingVariable(curVariable, intVals);
                     
-                    curVariable.count++;
-                    aggregateGroupingVariable(curVariable, intVals);
+                    if(curVariable.used)
+                    {
+                        initGroupingVariable(curVariable, intVals);
+                        
+                        curVariable.count++;
+                        aggregateGroupingVariable(curVariable, intVals);
+                    }
                 }
                 else
                 {
@@ -121,12 +126,12 @@ public class MFQueryExecutor {
                 String[] split = key.split("_");
                 switch(split[0])
                 {
-                    case max:
-                    case min:
-                        curVariable.aggMap.put(key, intVals.get(split[1]));
+                    case "max":
+                    case "min":
+                        curVariable.aggMap.get(key).getAndSet(intVals.get(split[1]));
                         break;
                     default:
-                        curVariable.aggMap.put(key, 0);
+                        curVariable.aggMap.get(key).getAndSet(0);
                         break;
                 }
             }
@@ -143,20 +148,21 @@ public class MFQueryExecutor {
             String[] split = key.split("_");
             switch(split[0])
             {
-                case max:
-                    if(intVals.get(split[1]).intValue() >= value)
+                case "max":
+                    if(intVals.get(split[1]).intValue() >= value.intValue())
                         value.set(intVals.get(split[1]).intValue());
                     break;
-                case min:
-                    if(intVals.get(split[1]).intValue() <= value)
+                case "min":
+                    if(intVals.get(split[1]).intValue() <= value.intValue())
                         value.set(intVals.get(split[1]).intValue());
                     break;
-                case sum:
-                    value.addAndGet(intVals.get(split[1]).intValue());
+                case "sum":
+                    value.getAndAdd(intVals.get(split[1]).intValue());
                     break;
-                case avg:
+                case "avg":
                     int prevSum = value.get() * (curVariable.count - 1);
                     int newAvg = (prevSum + intVals.get(split[1]).intValue()) / curVariable.count;
+                    value.set(newAvg);
                     break;
             }
         }
@@ -165,15 +171,19 @@ public class MFQueryExecutor {
     //TODO: create this function
     public void outputResults()
     {
-    	//TODO: print column headers
-    	
-    	for(MFStruct curStruct : mftable.values())
-    	{	
-    		if(true) //TODO: test having conditions here
-    		{
-    			//TODO: print results here
-    		}
-    	}
+        System.out.printf("%-8s  ", "column1");            //left aligned
+        System.out.printf("%.2f  ", "column2");            //left aligned
+        System.out.printf("%.2f  ", "column3");             //right aligned
+        System.out.printf("%.2f  ", "column4");
+        System.out.println();
+        
+        for(MFStruct curStruct : mftable.values())
+        {   
+            if(true) //TODO: test having conditions here
+            {
+                //TODO: print results here
+            }
+        }
     }
 
     public class GroupingVariable {
@@ -194,7 +204,7 @@ public class MFQueryExecutor {
         {
             if(this.used == false)
             {
-                this.used == true;
+                this.used = true;
             }
             aggMap.put(agg, new AtomicInteger());
         }
@@ -233,15 +243,10 @@ public class MFQueryExecutor {
                         groupVars[0].addAggregate(split[0]+"_"+split[1]);
                         break;
                     case 3:
-                        groupVars[split[2]].addAggregate(split[0]+"_"+split[1]);
+                        groupVars[Integer.parseInt(split[2])].addAggregate(split[0]+"_"+split[1]);
                         break;
                 }
             }
-        }
-
-        public void initAggregates()
-        {
-
         }
     }
 

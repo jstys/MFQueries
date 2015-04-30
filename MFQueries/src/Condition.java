@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 /************************************
  * Author: Jim Stys
  * Date: 4/7/2015
@@ -12,11 +14,12 @@ public class Condition {
 	private static final String JAVA_OR = "||";
 	private static final String JAVA_AND = "&&";
 	private static final String JAVA_EQUALS_TO = "==";
-	
+	public ArrayList<String> aggregateFunctions;
 	private String javaString = "";
 	
 	public Condition(String sqlCondition)
 	{
+		aggregateFunctions = new ArrayList<String>();
 		String[] tokens = sqlCondition.split(" ");
 		for(int i = 0; i < tokens.length; i++)
 		{
@@ -34,6 +37,10 @@ public class Condition {
 			}
 			else
 			{
+				if(InputParser.isAggregate(tokens[i]))
+				{
+					aggregateFunctions.add(tokens[i]);
+				}
 				javaString += tokens[i];
 			}
 		}
