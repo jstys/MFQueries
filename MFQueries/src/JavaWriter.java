@@ -74,6 +74,7 @@ public class JavaWriter {
 	private String connectTemplate;
 	private String retrieveTemplate1;
 	private String retrieveTemplate2;
+	private String groupVarClassTemplate;
 	
 	public JavaWriter(InputParser parsed)
 	{
@@ -111,6 +112,10 @@ public class JavaWriter {
 					case "RETRIEVE_START2":
 						input.nextLine();
 						retrieveTemplate2 = readTemplate("RETRIEVE_END", input);
+					case "GROUPVARCLASS_START":
+						input.nextLine();
+						groupVarClassTemplate = readTemplate("GROUPVARCLASS_END", input);
+						
 				}
 				line = input.nextLine();
 			}
@@ -135,7 +140,7 @@ public class JavaWriter {
 	
 	private void getMFData()
 	{
-		this.mfdata = new String[parsed.getV().length + parsed.getF().length][2];
+		this.mfdata = new String[parsed.getV().length][2];
 		for(int i = 0; i < parsed.getV().length; i++)
 		{
 			String name = parsed.getV()[i];
@@ -143,14 +148,6 @@ public class JavaWriter {
 			
 			this.mfdata[i][MF_NAME] = name;
 			this.mfdata[i][MF_TYPE] = type;
-		}
-		
-		for(int i = 0; i < parsed.getF().length; i++)
-		{
-			String name = parsed.getF()[i];
-			
-			this.mfdata[i + parsed.getV().length][MF_NAME] = name;
-			this.mfdata[i + parsed.getV().length][MF_TYPE] = DBTYPE_INTEGER;
 		}
 	}
 	
@@ -203,6 +200,7 @@ public class JavaWriter {
 		connect.body().directStatement(connectTemplate);
 		
 		generateRetrieveFunction();
+		runnerClass.direct(groupVarClassTemplate);
 		generateStructClass();
 	}
 	
@@ -330,8 +328,8 @@ public class JavaWriter {
 			String[] column = mfdata[i];
 			mfstructClass.field(JMod.PUBLIC, codeModel.parseType(getJavaType(column[MF_TYPE])), column[MF_NAME]);
 		}
-		mfstructClass.field(JMod.PUBLIC, codeModel.BOOLEAN, "initialized");
-		mfstructClass.field(JMod.PUBLIC, codeModel.INT, "count");
+		mfstructClass.field(JMod.PUBLIC, codeModel.parseType("GroupingVariable[]"), "groupVars");
+		mfstructClass.field(JMod.PUBLIC, codeModel.parseType("String[]"), "aggregateFunctions");
 	}
 	
 	private void generateMFStructConstructor() throws IOException, ClassNotFoundException
@@ -342,15 +340,27 @@ public class JavaWriter {
 			String[] column = mfdata[i];
 			construct.param(codeModel.parseType(getJavaType(column[MF_TYPE])), column[MF_NAME]);
 		}
+		construct.param(codeModel.parseType("String[]"), "aggFcns");
+		construct.param(codeModel.INT, "numGroupVars");
 		
+		//Initialize properties
 		JBlock body = construct.body();
 		for(int i = 0; i < mfdata.length; i++)
 		{
 			String[] column = mfdata[i];
 			body.assign(JExpr._this().ref(mfstructClass.fields().get(column[MF_NAME])), JExpr.ref(construct.params().get(i).name()));
 		}
-		body.assign(JExpr._this().ref(mfstructClass.fields().get("initialized")), JExpr.FALSE);
-		body.assign(JExpr._this().ref(mfstructClass.fields().get("count")), JExpr.lit(0));
+		body.directStatement("groupVars = new GroupingVariable[numGroupVars+1];");
+		body.directStatement("for(int i = 0; i < groupVars.length; i++){");
+		body.directStatement("    groupVars[i] = new GroupingVariable();");
+		body.directStatement("}");
+		body.directStatement("initStruct()");
+	}
+	
+	private void generateMFStructInit()
+	{
+		JMethod initFcn = mfstructClass.method(JMod.PRIVATE, codeModel.VOID, "initStruct");
+		JBlock body = initFcn.body();
 	}
 	
 	private String getJavaType(String dbType)

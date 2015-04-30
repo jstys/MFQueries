@@ -63,6 +63,7 @@ public class MFQueryExecutor {
                 String prod = rs.getString(2);
                 String cust = rs.getString(1);
 
+                //InputParser.getAggregateFunctions()
                 String [] aggregates = {"max_quant","avg_quant_1"};
 
                 //Initialize total MFStruct for the grouping
@@ -74,14 +75,20 @@ public class MFQueryExecutor {
                 {
                     MFStruct curStruct = mftable.get(cust+"_"+prod);
                     GroupingVariable curVariable = curStruct.groupVars[0];
-                    
-                    if(curVariable.used)
+
+                    if(!curStruct.groupVars[0].used)
                     {
-                        initGroupingVariable(curVariable, intVals);
-                        
-                        curVariable.count++;
-                        aggregateGroupingVariable(curVariable, intVals);
+                        //Reset result set to beginning
+                        more = rs.first();
+                        more = rs.next();
+                        scan++;
+                        continue;
                     }
+                    
+                    initGroupingVariable(curVariable, intVals);
+                    
+                    curVariable.count++;
+                    aggregateGroupingVariable(curVariable, intVals);
                 }
                 else
                 {

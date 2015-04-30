@@ -59,6 +59,11 @@ public class InputParser {
 	{
 		return G;
 	}
+
+	public ArrayList<String> getAggregateFunctions()
+	{
+		return aggregateFunctions;
+	}
 	
 	/*****************************
 	 * MUTATOR METHODS

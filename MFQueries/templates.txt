@@ -23,4 +23,29 @@ RETRIEVE_START2
 System.out.println("Connection URL or username or password errors!");
         _x.printStackTrace();
 RETRIEVE_END
+GROUPVARCLASS_START
+public class GroupingVariable {
+		public HashMap<String, AtomicInteger> aggMap;
+        public boolean initialized;
+        public boolean used;
+        public int count;
+
+        public GroupingVariable()
+        {
+            count = 0;
+            initialized = false;
+            used = false;
+            aggMap = new HashMap<String, AtomicInteger>();
+        }
+
+        public void addAggregate(String agg)
+        {
+            if(this.used == false)
+            {
+                this.used = true;
+            }
+            aggMap.put(agg, new AtomicInteger());
+        }
+    }
+GROUPVARCLASS_END
 END_TEMPLATE
