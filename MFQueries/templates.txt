@@ -48,4 +48,22 @@ public class GroupingVariable {
         }
     }
 GROUPVARCLASS_END
+INITSTRUCT_START
+private void initStruct() 
+        {
+            for(int i = 0; i < aggregateFunctions.length; i++)
+            {
+                String[] split = aggregateFunctions[i].split("_");
+                switch(split.length)
+                {
+                    case 2:
+                        groupVars[0].addAggregate(split[0]+"_"+split[1]);
+                        break;
+                    case 3:
+                        groupVars[Integer.parseInt(split[2])].addAggregate(split[0]+"_"+split[1]);
+                        break;
+                }
+            }
+        }
+INITSTRUCT_END
 END_TEMPLATE

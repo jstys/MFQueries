@@ -75,6 +75,7 @@ public class JavaWriter {
 	private String retrieveTemplate1;
 	private String retrieveTemplate2;
 	private String groupVarClassTemplate;
+	private String initStructTemplate;
 	
 	public JavaWriter(InputParser parsed)
 	{
@@ -115,6 +116,9 @@ public class JavaWriter {
 					case "GROUPVARCLASS_START":
 						input.nextLine();
 						groupVarClassTemplate = readTemplate("GROUPVARCLASS_END", input);
+					case "INITSTRUCT_START":
+						input.nextLine();
+						initStructTemplate = readTemplate("INITSTRUCT_END", input);
 						
 				}
 				line = input.nextLine();
@@ -319,6 +323,7 @@ public class JavaWriter {
 		mfstructClass = runnerClass._class(STRUCT_CLASS);
 		generateMFStructProperties();
 		generateMFStructConstructor();
+		mfstructClass.direct(initStructTemplate);
 	}
 	
 	private void generateMFStructProperties() throws IOException, ClassNotFoundException
@@ -355,12 +360,6 @@ public class JavaWriter {
 		body.directStatement("    groupVars[i] = new GroupingVariable();");
 		body.directStatement("}");
 		body.directStatement("initStruct()");
-	}
-	
-	private void generateMFStructInit()
-	{
-		JMethod initFcn = mfstructClass.method(JMod.PRIVATE, codeModel.VOID, "initStruct");
-		JBlock body = initFcn.body();
 	}
 	
 	private String getJavaType(String dbType)
