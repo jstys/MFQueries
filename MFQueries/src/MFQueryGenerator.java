@@ -9,7 +9,12 @@
  * the input and then relies on other classes for
  * parsing and outputing additional java source.
  ************************************/
+import java.io.FileReader;
 import java.util.Scanner;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
 
 public class MFQueryGenerator {
@@ -28,8 +33,34 @@ public class MFQueryGenerator {
 	 *****************************/
 	public static void main(String[] args)
 	{
+		JSONParser parser = new JSONParser();
 		inputParser = new InputParser();
-		getUserInput();
+		if(args.length > 0)
+		{
+			try {
+ 
+	            Object obj = parser.parse(new FileReader(
+	                    args[0]));
+	 
+	            JSONObject jsonObject = (JSONObject) obj;
+	 
+	            inputParser.setS((JSONArray) jsonObject.get("projectedAttributes"));
+	            inputParser.setN(((Long)jsonObject.get("numGroupingVars")).intValue());
+	            inputParser.setV((JSONArray) jsonObject.get("groupingAttributes"));
+	            inputParser.setF((JSONArray) jsonObject.get("aggregateFunctions"));
+	            inputParser.setSigma((JSONArray) jsonObject.get("sigmaConditions"));
+	            inputParser.setG((String) jsonObject.get("havingCondition"));
+	            
+	 
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	        }
+		}
+		else
+		{
+			getUserInput();
+		}
+
 		System.out.println(inputParser);
 		
 		javaWriter = new JavaWriter(inputParser);

@@ -1,5 +1,7 @@
 import java.util.ArrayList;
 
+import org.json.simple.JSONArray;
+
 /************************************
  * Author: Jim Stys
  * Date: 4/7/2015
@@ -18,7 +20,7 @@ public class InputParser {
 	private int n;				//Number of grouping variables
 	private String[] V;			//Grouping attributes
 	private String[] F;			//Array of aggregate functions
-	private Condition[] sigma;	//Selection conditions on grouped tuples
+	private ArrayList<ArrayList<Condition>> sigma;	//Selection conditions on grouped tuples
 	private Condition G;		//Having condition
 	private ArrayList<String> aggregateFunctions;
 	
@@ -50,7 +52,7 @@ public class InputParser {
 		return F;
 	}
 	
-	public Condition[] getSigma()
+	public ArrayList<ArrayList<Condition>> getSigma()
 	{
 		return sigma;
 	}
@@ -73,6 +75,12 @@ public class InputParser {
 		this.S = string.split(",");
 	}
 	
+	public void setS(JSONArray strings)
+	{
+		this.S = new String[strings.size()];
+		jsonArrayToArray(this.S, strings);
+	}
+	
 	public void setN(int n)
 	{
 		this.n = n;
@@ -83,18 +91,50 @@ public class InputParser {
 		this.V = string.split(",");
 	}
 	
+	public void setV(JSONArray strings)
+	{
+		this.V = new String[strings.size()];
+		jsonArrayToArray(this.V, strings);
+	}
+	
 	public void setF(String string)
 	{
 		this.F = string.split(",");
 	}
 	
+	public void setF(JSONArray strings)
+	{
+		this.F = new String[strings.size()];
+		jsonArrayToArray(this.F, strings);
+	}
+	
 	public void setSigma(String string)
 	{
 		String[] split = string.split("\n");
-		this.sigma = new Condition[split.length];
+		this.sigma = new ArrayList<ArrayList<Condition>>(this.n);
+		for(int i = 0; i < this.n; i++)
+		{
+			this.sigma.add(new ArrayList<Condition>());
+		}
 		for(int i = 0; i < split.length; i++)
 		{
-			this.sigma[i] = new Condition(split[i]);
+			int varNum = Integer.parseInt(split[i].split("_")[2]);
+			this.sigma.get(varNum).add(new Condition(split[i]));
+		}
+	}
+	
+	public void setSigma(JSONArray strings)
+	{
+		this.sigma = new ArrayList<ArrayList<Condition>>(this.n);
+		for(int i = 0; i < this.n; i++)
+		{
+			this.sigma.add(new ArrayList<Condition>());
+		}
+		for(int i = 0; i < strings.size(); i++)
+		{
+			String aggregate = ((String)strings.get(i)).split(" ")[0];
+			int varNum = Integer.parseInt(aggregate.split("_")[2]);
+			this.sigma.get(varNum).add(new Condition(((String)strings.get(i))));
 		}
 	}
 	
@@ -133,6 +173,23 @@ public class InputParser {
 		return result;
 	}
 	
+	public String arrayListToString(ArrayList<String> arr, String name)
+	{
+		String result = "";
+		result += name + ": [";
+		for(int i = 0; i < arr.size(); i++)
+		{
+			if(i != 0)
+			{
+				result += ",";
+			}
+			result += arr.get(i);
+		}
+		result += "]\n";
+		
+		return result;
+	}
+	
 	/*****************************
 	 * toString
 	 * 
@@ -142,17 +199,20 @@ public class InputParser {
 	public String toString()
 	{
 		String result = "";
-		String[] sigmaArray = new String[this.sigma.length];
-		for(int i = 0; i < this.sigma.length; i ++)
+		ArrayList<String> sigmaArray = new ArrayList<String>();
+		for(int i = 0; i < sigma.size(); i++)
 		{
-			sigmaArray[i] = this.sigma[i].getJavaString();
+			for(int j = 0; j < sigma.get(i).size(); j++)
+			{
+				sigmaArray.add(sigma.get(i).get(j).getJavaString());
+			}
 		}
 		
 		result += arrayToString(S, "S");
 		result += "n: " + n + "\n";
 		result += arrayToString(V, "V");
 		result += arrayToString(F, "F");
-		result += arrayToString(sigmaArray, "sigma");
+		result += arrayListToString(sigmaArray, "sigma");
 		result += "G: " + G.getJavaString() + "\n";
 		return result;
 	}
@@ -162,7 +222,7 @@ public class InputParser {
 		String[] split = str.split("_");
 		if(split.length >= 2)
 		{
-			return split[0].equalsIgnoreCase("max") || split[0].equalsIgnoreCase("min") || split[0].equalsIgnoreCase("avg") || split[0].equalsIgnoreCase("max");
+			return split[0].equalsIgnoreCase("max") || split[0].equalsIgnoreCase("min") || split[0].equalsIgnoreCase("avg") || split[0].equalsIgnoreCase("sum");
 		}
 		return false;
 	}
@@ -183,13 +243,16 @@ public class InputParser {
 				aggregateFunctions.add(this.F[i]);
 			}
 		}
-		for(int i = 0; i < sigma.length; i++)
+		for(int i = 0; i < sigma.size(); i++)
 		{
-			for(int j = 0; j < sigma[i].aggregateFunctions.size(); j++)
+			for(int j = 0; j < sigma.get(i).size(); j++)
 			{
-				if(!aggregateFunctions.contains(sigma[i].aggregateFunctions.get(j)))
+				for(int k = 0; k < sigma.get(i).get(j).aggregateFunctions.size(); k++)
 				{
-					aggregateFunctions.add(sigma[i].aggregateFunctions.get(j));
+					if(!aggregateFunctions.contains(sigma.get(i).get(j).aggregateFunctions.get(k)))
+					{
+						aggregateFunctions.add(sigma.get(i).get(j).aggregateFunctions.get(k));
+					}
 				}
 			}
 		}
@@ -201,5 +264,15 @@ public class InputParser {
 			}
 		}
 	}
+	
+	private void jsonArrayToArray(String[] arr, JSONArray json)
+	{
+		for(int i = 0; i < json.size(); i++)
+		{
+			arr[i] = (String)json.get(i);
+		}
+	}
 
 }
+
+

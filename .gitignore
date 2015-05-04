@@ -1,3 +1,5 @@
 .metadata/
 MFQueries/bin/
 Project_Runner/bin/
+MFQueries/json-20141113.jar
+MFQueries/MFQueryExecutor.java

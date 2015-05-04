@@ -94,9 +94,9 @@ public class MFQueryExecutor {
                 {
                    for (MFStruct curStruct : mftable.values()) 
                     {
+                        GroupingVariable curVariable = curStruct.groupVars[scan];
                         if(true)//conditions on curStruct
                         {
-                            GroupingVariable curVariable = curStruct.groupVars[scan];
                             initGroupingVariable(curVariable, intVals);
 
                             curVariable.count++;

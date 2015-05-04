@@ -1,0 +1,8 @@
+{
+	"projectedAttributes": ["cust","prod","avg_quant_1"],
+	"numGroupingVars": 3,
+	"groupingAttributes": ["cust", "prod"],
+	"aggregateFunctions": ["avg_quant_1"],
+	"sigmaConditions": ["avg_quant_1 > 0"],
+	"havingCondition": ""
+}

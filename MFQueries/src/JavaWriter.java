@@ -285,7 +285,7 @@ public class JavaWriter {
 		ifBody.directStatement(buildMFStruct);
 		
 		//TODO: add real parsing of sigma conditions
-		String conditionString = parsed.getSigma()[0].getJavaString();
+		String conditionString = "test";
 		JBlock conditionBody = whileBody._if(JExpr.direct(conditionString))._then();
 		
 		//Run mfstruct aggregate initialization
