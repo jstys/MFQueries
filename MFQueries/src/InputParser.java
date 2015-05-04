@@ -132,8 +132,17 @@ public class InputParser {
 		}
 		for(int i = 0; i < strings.size(); i++)
 		{
-			String aggregate = ((String)strings.get(i)).split(" ")[0];
-			int varNum = Integer.parseInt(aggregate.split("_")[2]);
+			int varNum;
+			String var = ((String)strings.get(i)).split(" ")[0];
+			if(isAggregate((String)strings.get(i)))
+			{
+				varNum = Integer.parseInt(var.split("_")[2]);
+			}
+			else
+			{
+				varNum = Integer.parseInt(var.split("_")[1]);
+			}
+			varNum--;
 			this.sigma.get(varNum).add(new Condition(((String)strings.get(i))));
 		}
 	}
@@ -263,6 +272,7 @@ public class InputParser {
 				aggregateFunctions.add(G.aggregateFunctions.get(i));
 			}
 		}
+		System.out.println(aggregateFunctions.size());
 	}
 	
 	private void jsonArrayToArray(String[] arr, JSONArray json)

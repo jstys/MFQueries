@@ -76,7 +76,7 @@ public class MFQueryExecutor {
                     MFStruct curStruct = mftable.get(cust+"_"+prod);
                     GroupingVariable curVariable = curStruct.groupVars[0];
 
-                    if(!curStruct.groupVars[0].used)
+                    if(!curVariable.used)
                     {
                         //Reset result set to beginning
                         more = rs.first();

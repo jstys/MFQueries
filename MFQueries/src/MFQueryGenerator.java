@@ -50,7 +50,7 @@ public class MFQueryGenerator {
 	            inputParser.setF((JSONArray) jsonObject.get("aggregateFunctions"));
 	            inputParser.setSigma((JSONArray) jsonObject.get("sigmaConditions"));
 	            inputParser.setG((String) jsonObject.get("havingCondition"));
-	            
+	            inputParser.findAggregates();
 	 
 	        } catch (Exception e) {
 	            e.printStackTrace();

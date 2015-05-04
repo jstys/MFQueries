@@ -76,6 +76,8 @@ public class JavaWriter {
 	private String retrieveTemplate2;
 	private String groupVarClassTemplate;
 	private String initStructTemplate;
+	private String mainFunctionsTemplate;
+	private String scan0Template;
 	
 	public JavaWriter(InputParser parsed)
 	{
@@ -119,6 +121,12 @@ public class JavaWriter {
 					case "INITSTRUCT_START":
 						input.nextLine();
 						initStructTemplate = readTemplate("INITSTRUCT_END", input);
+					case "GROUPVARFCNS_START":
+						input.nextLine();
+						mainFunctionsTemplate = readTemplate("GROUPVARFCNS_END", input);
+					case "SCAN0_START":
+						input.nextLine();
+						scan0Template = readTemplate("SCAN0_END", input);
 						
 				}
 				line = input.nextLine();
@@ -178,23 +186,17 @@ public class JavaWriter {
 		runnerClass = codeModel._class(RUNNER_CLASS);
 		
 		JClass Hashmap = codeModel.ref(java.util.HashMap.class).narrow(String.class).narrow(codeModel.parseType("MFStruct"));
-		JClass arraylistHashmap = codeModel.ref(java.util.ArrayList.class).narrow(Hashmap);
-		JClass arraylistString = codeModel.ref(java.util.ArrayList.class).narrow(String.class);
-		runnerClass.field(JMod.PRIVATE, arraylistHashmap, "mftable");
-		runnerClass.field(JMod.PRIVATE, arraylistString, "mfkeys");
+		JClass AtomInt = codeModel.ref(java.util.concurrent.atomic.AtomicInteger.class);
+		JClass Map = codeModel.ref(java.util.Map.class);
+		runnerClass.field(JMod.PRIVATE, AtomInt, "test");
+		runnerClass.field(JMod.PRIVATE, Hashmap, "mftable");
+		runnerClass.field(JMod.PRIVATE, Map, "maptest");
 		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType("String"), "usr").init(JExpr.lit("postgres"));
 		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType("String"), "pwd").init(JExpr.lit("anycolor92"));
 		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType("String"), "url").init(JExpr.lit("jdbc:postgresql://localhost:5432/postgres"));
 		
 		JMethod construct = runnerClass.constructor(JMod.PUBLIC);
-		construct.body().directStatement("mfkeys = new ArrayList<String>();");
-		construct.body().directStatement("mftable = new ArrayList<HashMap<String,MFStruct>>(" + parsed.getN() + ");");
-		
-		JForLoop forLoop = construct.body()._for();
-		JVar ivar = forLoop.init(codeModel.INT, "i", JExpr.lit(0));
-		forLoop.test(ivar.lt(JExpr.lit(parsed.getN())));
-		forLoop.update(ivar.assignPlus(JExpr.lit(1)));
-		forLoop.body().directStatement("mftable.set(i, new HashMap<String, MFStruct>());");
+		construct.body().directStatement("mftable = new HashMap<String,MFStruct>();");
 		
 		JMethod main = runnerClass.method(JMod.PUBLIC+JMod.STATIC, void.class, "main");
 		main.param(String[].class, "args");
@@ -204,6 +206,7 @@ public class JavaWriter {
 		connect.body().directStatement(connectTemplate);
 		
 		generateRetrieveFunction();
+		runnerClass.direct(mainFunctionsTemplate);
 		runnerClass.direct(groupVarClassTemplate);
 		generateStructClass();
 	}
@@ -227,17 +230,30 @@ public class JavaWriter {
 		//Setup DB connection
 		JVar con = tryBody.decl(connectionClass, "con", driverManagerClass.staticInvoke("getConnection").arg(runnerClass.fields().get("url")).arg(runnerClass.fields().get("usr")).arg(runnerClass.fields().get("pwd")));
 		tryBody.decl(resultSetClass, "rs");
-		tryBody.decl(statementClass, "st", con.invoke("createStatement"));
+		tryBody.decl(statementClass, "st", con.invoke("createStatement").arg(JExpr.direct("ResultSet.TYPE_SCROLL_SENSITIVE")).arg(JExpr.direct("ResultSet.CONCUR_READ_ONLY")));
 		tryBody.directStatement(retrieveTemplate1);
+		JVar numScans = tryBody.decl(codeModel.INT, "numScans", JExpr.direct(""+(parsed.getN()+1)));
+		JVar scan = tryBody.decl(codeModel.INT, "scan", JExpr.direct("0"));
+		String aggArray = "String [] aggregates = {";
+		for(int i = 0; i < this.parsed.getAggregateFunctions().size(); i++)
+		{
+			if(i != 0)
+			{
+				aggArray += ",";
+			}
+			aggArray += "\""+this.parsed.getAggregateFunctions().get(i)+"\"";
+		}
+		aggArray += "};";
+		tryBody.directStatement(aggArray);
 		
 		//While loop through entire resultset
-		JBlock whileBody = tryBody._while(JExpr.ref("more")).body();
+		JBlock whileBody = tryBody._while(JExpr.direct("more && scan < numScans")).body();
 		Iterator it = dbconnector.columndata.entrySet().iterator();
 		
-		String key = "";	//Dynamically create the key from grouping attributes
+		whileBody.directStatement("HashMap<String, Integer> intVals = new HashMap<String, Integer>();");
 		
-		whileBody.directStatement("int mftableIndex = -1;");
-		whileBody.directStatement("int count = -1;");
+		
+		String key = "";	//Dynamically create the key from grouping attributes
 		
 		//Fetch values by column number
 		while(it.hasNext())
@@ -247,6 +263,10 @@ public class JavaWriter {
         	String type = ((Pair<String,Integer>)entry.getValue()).getValue0();
         	int index = ((Pair<String,Integer>)entry.getValue()).getValue1().intValue();
         	whileBody.directStatement(getJavaType(type) + " " + name + " = rs." + getResultSetType(type) + "("+index+");");
+        	if(getJavaType(type).equals("int"))
+        	{
+        		whileBody.directStatement("intVals.put(\""+name+"\","+name+");");
+        	}
         	index++;
         }
 		
@@ -267,8 +287,7 @@ public class JavaWriter {
 			}
 			groupingAttrb += name;
 		}
-		
-		whileBody.directStatement("!mfkeys.contains("+key+") ? (mfkeys.add("+key+");");
+		groupingAttrb += ",aggregates,numScans";
 		
 		//Build string for initializing mfstruct
 		String buildMFStruct = "mftable.put(" + key + ", new MFStruct(" + groupingAttrb;
@@ -284,34 +303,10 @@ public class JavaWriter {
 		JBlock ifBody = whileBody._if(JExpr.direct("mftable.get(" + key + ") == null"))._then();
 		ifBody.directStatement(buildMFStruct);
 		
-		//TODO: add real parsing of sigma conditions
-		String conditionString = "test";
+		String conditionString = "scan == 0";
 		JBlock conditionBody = whileBody._if(JExpr.direct(conditionString))._then();
-		
-		//Run mfstruct aggregate initialization
-		JBlock initializeBody = conditionBody._if(JExpr.direct("mftable.get(" + key + ").initialized == false"))._then();
-		initializeBody.directStatement("mftable.get(" + key + ").initialized = true;");
-		for(int i = 0; i < parsed.getF().length; i++)
-		{
-			String func = parsed.getF()[i];
-			String initVal;
-			switch(func.split("_")[AGGREGATE_FUNCTION])
-			{
-				case "min":
-				case "max":
-					initVal = func.split("_")[AGGREGATE_COLUMN];
-					break;
-				default:
-					initVal = "0";
-			}
-			initializeBody.directStatement("mftable.get(" + key + ")."+func+" = "+initVal+";");
-		}
-		
-		//Increment the count in the mfstruct for this key
-		conditionBody.directStatement("mftable.get(" + key + ").count++;");
-		conditionBody.directStatement("System.out.println(mftable.get(" + key + ").count);");
-		
-		whileBody.directStatement("more = rs.next();");
+		conditionBody.directStatement("MFStruct curStruct = mftable.get("+key+");");
+		conditionBody.directStatement(scan0Template);
 		
 		//Generate catch block for db connections
 		JBlock catchBody = tryBlock._catch(sqlExceptionClass).body();
@@ -355,11 +350,12 @@ public class JavaWriter {
 			String[] column = mfdata[i];
 			body.assign(JExpr._this().ref(mfstructClass.fields().get(column[MF_NAME])), JExpr.ref(construct.params().get(i).name()));
 		}
+		body.directStatement("this.aggregateFunctions = aggFcns;");
 		body.directStatement("groupVars = new GroupingVariable[numGroupVars+1];");
 		body.directStatement("for(int i = 0; i < groupVars.length; i++){");
 		body.directStatement("    groupVars[i] = new GroupingVariable();");
 		body.directStatement("}");
-		body.directStatement("initStruct()");
+		body.directStatement("initStruct();");
 	}
 	
 	private String getJavaType(String dbType)

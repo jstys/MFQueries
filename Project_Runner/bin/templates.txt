@@ -23,4 +23,144 @@ RETRIEVE_START2
 System.out.println("Connection URL or username or password errors!");
         _x.printStackTrace();
 RETRIEVE_END
+GROUPVARCLASS_START
+public class GroupingVariable {
+		public HashMap<String, AtomicInteger> aggMap;
+        public boolean initialized;
+        public boolean used;
+        public int count;
+
+        public GroupingVariable()
+        {
+            count = 0;
+            initialized = false;
+            used = false;
+            aggMap = new HashMap<String, AtomicInteger>();
+        }
+
+        public void addAggregate(String agg)
+        {
+            if(this.used == false)
+            {
+                this.used = true;
+            }
+            aggMap.put(agg, new AtomicInteger());
+        }
+        
+        public int get(String agg)
+        {
+        	return aggMap.get(agg).intValue();
+        }
+    }
+GROUPVARCLASS_END
+INITSTRUCT_START
+private void initStruct() 
+        {
+            for(int i = 0; i < aggregateFunctions.length; i++)
+            {
+                String[] split = aggregateFunctions[i].split("_");
+                switch(split.length)
+                {
+                    case 2:
+                        groupVars[0].addAggregate(split[0]+"_"+split[1]);
+                        break;
+                    case 3:
+                        groupVars[Integer.parseInt(split[2])].addAggregate(split[0]+"_"+split[1]);
+                        break;
+                }
+            }
+        }
+INITSTRUCT_END
+GROUPVARFCNS_START
+public void initGroupingVariable(GroupingVariable curVariable, HashMap<String, Integer> intVals)
+    {
+        if (curVariable.initialized == false)
+        {
+            for (String key : curVariable.aggMap.keySet()) 
+            {
+                String[] split = key.split("_");
+                switch(split[0])
+                {
+                    case "max":
+                    case "min":
+                        curVariable.aggMap.get(key).getAndSet(intVals.get(split[1]));
+                        break;
+                    default:
+                        curVariable.aggMap.get(key).getAndSet(0);
+                        break;
+                }
+            }
+            curVariable.initialized = true;
+        }
+    }
+
+    public void aggregateGroupingVariable(GroupingVariable curVariable, HashMap<String, Integer> intVals)
+    {
+        for (Map.Entry<String, AtomicInteger> entry : curVariable.aggMap.entrySet()) 
+        {
+            String key = entry.getKey();
+            AtomicInteger value = entry.getValue();
+            String[] split = key.split("_");
+            switch(split[0])
+            {
+                case "max":
+                    if(intVals.get(split[1]).intValue() >= value.intValue())
+                        value.set(intVals.get(split[1]).intValue());
+                    break;
+                case "min":
+                    if(intVals.get(split[1]).intValue() <= value.intValue())
+                        value.set(intVals.get(split[1]).intValue());
+                    break;
+                case "sum":
+                    value.getAndAdd(intVals.get(split[1]).intValue());
+                    break;
+                case "avg":
+                    int prevSum = value.get() * (curVariable.count - 1);
+                    int newAvg = (prevSum + intVals.get(split[1]).intValue()) / curVariable.count;
+                    value.set(newAvg);
+                    break;
+            }
+        }
+    }
+GROUPVARFCNS_END
+SCAN0_START
+GroupingVariable curVariable = curStruct.groupVars[0];
+
+                    if(!curVariable.used)
+                    {
+                        //Reset result set to beginning
+                        more = rs.first();
+                        more = rs.next();
+                        scan++;
+                        continue;
+                    }
+                    
+                    initGroupingVariable(curVariable, intVals);
+                    
+                    curVariable.count++;
+                    aggregateGroupingVariable(curVariable, intVals);
+                }
+                else
+                {
+                   for (MFStruct curStruct : mftable.values()) 
+                    {
+                        GroupingVariable curVariable = curStruct.groupVars[scan];
+                        if(true)//conditions on curStruct
+                        {
+                            initGroupingVariable(curVariable, intVals);
+
+                            curVariable.count++;
+                            aggregateGroupingVariable(curVariable, intVals);
+                        }
+                    } 
+                }
+
+                more = rs.next();
+                if(!more)
+                {
+                    //Reset result set to beginning
+                    more = rs.first();
+                    more = rs.next();
+                    scan++;
+SCAN0_END
 END_TEMPLATE
