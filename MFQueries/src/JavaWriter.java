@@ -29,12 +29,14 @@ import com.sun.codemodel.JBlock;
 import com.sun.codemodel.JClass;
 import com.sun.codemodel.JClassAlreadyExistsException;
 import com.sun.codemodel.JCodeModel;
+import com.sun.codemodel.JConditional;
 import com.sun.codemodel.JDefinedClass;
 import com.sun.codemodel.JExpr;
-import com.sun.codemodel.JForLoop;
+import com.sun.codemodel.JForEach;
 import com.sun.codemodel.JMethod;
 import com.sun.codemodel.JMod;
 import com.sun.codemodel.JTryBlock;
+import com.sun.codemodel.JType;
 import com.sun.codemodel.JVar;
 
 
@@ -152,15 +154,19 @@ public class JavaWriter {
 	
 	private void getMFData()
 	{
-		this.mfdata = new String[parsed.getV().length][2];
-		for(int i = 0; i < parsed.getV().length; i++)
-		{
-			String name = parsed.getV()[i];
-			String type = dbconnector.columndata.get(name).getValue0();
-			
-			this.mfdata[i][MF_NAME] = name;
-			this.mfdata[i][MF_TYPE] = type;
-		}
+		this.mfdata = new String[dbconnector.columndata.size()][2];
+		Iterator it = dbconnector.columndata.entrySet().iterator();
+		int index = 0;
+		
+		while(it.hasNext())
+        { 
+        	Map.Entry entry = (Map.Entry)it.next();
+        	String name = (String)entry.getKey();
+        	String type = ((Pair<String,Integer>)entry.getValue()).getValue0();
+        	this.mfdata[index][MF_NAME] = name;
+        	this.mfdata[index][MF_TYPE] = type;
+        	index++;
+        }
 	}
 	
 	public void generateJavaSource()
@@ -206,6 +212,7 @@ public class JavaWriter {
 		connect.body().directStatement(connectTemplate);
 		
 		generateRetrieveFunction();
+		generateOutputMethod();
 		runnerClass.direct(mainFunctionsTemplate);
 		runnerClass.direct(groupVarClassTemplate);
 		generateStructClass();
@@ -281,11 +288,14 @@ public class JavaWriter {
     			key += "+\"_\"+";
     		}
     		key += name;
+		}
+		for(int i = 0; i < this.mfdata.length; i++)
+		{
 			if(i != 0)
 			{
 				groupingAttrb += ",";
 			}
-			groupingAttrb += name;
+			groupingAttrb += this.mfdata[i][MF_NAME];
 		}
 		groupingAttrb += ",aggregates,numScans";
 		
@@ -304,9 +314,51 @@ public class JavaWriter {
 		ifBody.directStatement(buildMFStruct);
 		
 		String conditionString = "scan == 0";
-		JBlock conditionBody = whileBody._if(JExpr.direct(conditionString))._then();
+		JConditional condition = whileBody._if(JExpr.direct(conditionString));
+		JBlock conditionBody = condition._then();
+		JBlock conditionElse = condition._else();
+		JBlock foreachLoop = conditionElse.forEach(codeModel.directClass("MFStruct"), "curStruct", JExpr.direct("mftable.values()")).body();
+		foreachLoop.directStatement("GroupingVariable curVariable = curStruct.groupVars[scan];");
+		JConditional suchThatConditions = null;
+		for(int i = 0; i < this.parsed.getN(); i++)
+		{
+			String suchThat = "scan == " + (i+1);
+			for(int j = 0; j < this.parsed.getSigma().get(i).size(); j++)
+			{
+				suchThat += " && ";
+				if(InputParser.isAggregate(this.parsed.getSigma().get(i).get(j).lhs))
+				{
+					suchThat += "curVariable.get("+this.parsed.getSigma().get(i).get(j).lhs+")"+this.parsed.getSigma().get(i).get(j).rhs;
+				}
+				else
+				{
+					suchThat += "curStruct."+this.parsed.getSigma().get(i).get(j).lhs+this.parsed.getSigma().get(i).get(j).rhs;
+				}
+			}
+			if(i == 0)
+			{
+				suchThatConditions = foreachLoop._if(JExpr.direct(suchThat));
+				JBlock suchThatBody = suchThatConditions._then();
+				suchThatBody.directStatement("aggregateGroupingVariable(curVariable, intVals);");
+			}
+			else
+			{
+				JBlock suchThatBody = suchThatConditions._elseif(JExpr.direct(suchThat))._then();
+				suchThatBody.directStatement("aggregateGroupingVariable(curVariable, intVals);");
+			}
+		}
 		conditionBody.directStatement("MFStruct curStruct = mftable.get("+key+");");
-		conditionBody.directStatement(scan0Template);
+		conditionBody.directStatement("GroupingVariable curVariable = curStruct.groupVars[0];");
+		conditionBody.directStatement("aggregateGroupingVariable(curVariable, intVals);");
+		
+		whileBody.directStatement("more = rs.next();");
+		whileBody.directStatement("if(!more)");
+		whileBody.directStatement("{");
+		whileBody.directStatement("    more = rs.first();");
+		whileBody.directStatement("    scan++;");
+		whileBody.directStatement("}");
+		tryBody.directStatement("outputResults();");
+
 		
 		//Generate catch block for db connections
 		JBlock catchBody = tryBlock._catch(sqlExceptionClass).body();
@@ -356,6 +408,20 @@ public class JavaWriter {
 		body.directStatement("    groupVars[i] = new GroupingVariable();");
 		body.directStatement("}");
 		body.directStatement("initStruct();");
+	}
+	
+	private void generateOutputMethod()
+	{
+		//Generate method header
+		JMethod outputMethod = runnerClass.method(JMod.PRIVATE, void.class, "outputResults");
+		JBlock methodBody = outputMethod.body();
+		
+		for(int i = 0; i < this.parsed.getS().length; i++)
+		{
+			methodBody.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+3)+"s\", \"" + this.parsed.getS()[i] + "\");"); 
+		}
+		
+		JBlock foreachLoop = methodBody.forEach(codeModel.directClass("MFStruct"), "curStruct", JExpr.direct("mftable.values()")).body();
 	}
 	
 	private String getJavaType(String dbType)

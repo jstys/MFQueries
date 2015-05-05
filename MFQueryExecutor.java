@@ -45,7 +45,7 @@ public class MFQueryExecutor {
             
             String ret = "select * from sales";
             rs = st.executeQuery(ret);              //executing the query 
-            more=rs.next();                         //checking if more rows available
+            more=rs.first();                         //checking if more rows available
             int numScans = 3;
             int scan = 0;
 
@@ -75,19 +75,8 @@ public class MFQueryExecutor {
                 {
                     MFStruct curStruct = mftable.get(cust+"_"+prod);
                     GroupingVariable curVariable = curStruct.groupVars[0];
-
-                    if(!curVariable.used)
-                    {
-                        //Reset result set to beginning
-                        more = rs.first();
-                        more = rs.next();
-                        scan++;
-                        continue;
-                    }
                     
-                    initGroupingVariable(curVariable, intVals);
                     
-                    curVariable.count++;
                     aggregateGroupingVariable(curVariable, intVals);
                 }
                 else
@@ -97,9 +86,6 @@ public class MFQueryExecutor {
                         GroupingVariable curVariable = curStruct.groupVars[scan];
                         if(true)//conditions on curStruct
                         {
-                            initGroupingVariable(curVariable, intVals);
-
-                            curVariable.count++;
                             aggregateGroupingVariable(curVariable, intVals);
                         }
                     } 
@@ -110,7 +96,6 @@ public class MFQueryExecutor {
                 {
                     //Reset result set to beginning
                     more = rs.first();
-                    more = rs.next();
                     scan++;
                 }
             }
@@ -148,6 +133,8 @@ public class MFQueryExecutor {
 
     public void aggregateGroupingVariable(GroupingVariable curVariable, HashMap<String, Integer> intVals)
     {
+        initGroupingVariable(curVariable, intVals);            
+        curVariable.count++;
         for (Map.Entry<String, AtomicInteger> entry : curVariable.aggMap.entrySet()) 
         {
             String key = entry.getKey();
@@ -250,7 +237,7 @@ public class MFQueryExecutor {
                         groupVars[0].addAggregate(split[0]+"_"+split[1]);
                         break;
                     case 3:
-                        groupVars[Integer.parseInt(split[2])].addAggregate(split[0]+"_"+split[1]);
+                        groupVars[Integer.parseInt(split[2])].addAggregate(split[0]+"_"+split[1]+"_"+split[2]);
                         break;
                 }
             }

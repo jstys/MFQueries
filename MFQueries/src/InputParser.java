@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.json.simple.JSONArray;
 
 /************************************
@@ -23,6 +24,7 @@ public class InputParser {
 	private ArrayList<ArrayList<Condition>> sigma;	//Selection conditions on grouped tuples
 	private Condition G;		//Having condition
 	private ArrayList<String> aggregateFunctions;
+	private ArrayList<String> groupAttribs;
 	
 	public InputParser()
 	{
@@ -232,6 +234,16 @@ public class InputParser {
 		if(split.length >= 2)
 		{
 			return split[0].equalsIgnoreCase("max") || split[0].equalsIgnoreCase("min") || split[0].equalsIgnoreCase("avg") || split[0].equalsIgnoreCase("sum");
+		}
+		return false;
+	}
+	
+	public static boolean isGroupAttrib(String str)
+	{
+		String[] split = str.split("_");
+		if(split.length >= 2)
+		{
+			return NumberUtils.isNumber(split[split.length-1]);
 		}
 		return false;
 	}

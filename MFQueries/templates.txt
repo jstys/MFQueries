@@ -65,7 +65,7 @@ private void initStruct()
                         groupVars[0].addAggregate(split[0]+"_"+split[1]);
                         break;
                     case 3:
-                        groupVars[Integer.parseInt(split[2])].addAggregate(split[0]+"_"+split[1]);
+                        groupVars[Integer.parseInt(split[2])].addAggregate(split[0]+"_"+split[1]+"_"+split[2]);
                         break;
                 }
             }
@@ -126,15 +126,6 @@ GROUPVARFCNS_END
 SCAN0_START
 GroupingVariable curVariable = curStruct.groupVars[0];
 
-                    if(!curVariable.used)
-                    {
-                        //Reset result set to beginning
-                        more = rs.first();
-                        more = rs.next();
-                        scan++;
-                        continue;
-                    }
-                    
                     initGroupingVariable(curVariable, intVals);
                     
                     curVariable.count++;
@@ -160,7 +151,6 @@ GroupingVariable curVariable = curStruct.groupVars[0];
                 {
                     //Reset result set to beginning
                     more = rs.first();
-                    more = rs.next();
                     scan++;
 SCAN0_END
 END_TEMPLATE

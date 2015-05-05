@@ -15,33 +15,50 @@ public class Condition {
 	private static final String JAVA_AND = "&&";
 	private static final String JAVA_EQUALS_TO = "==";
 	public ArrayList<String> aggregateFunctions;
+	public String lhs;
+	public String rhs;
 	private String javaString = "";
 	
 	public Condition(String sqlCondition)
 	{
 		aggregateFunctions = new ArrayList<String>();
 		String[] tokens = sqlCondition.split(" ");
-		for(int i = 0; i < tokens.length; i++)
+		if(!tokens[0].equals(""))
 		{
-			if(tokens[i].equals("="))
+			this.lhs = tokens[0];
+			if(!InputParser.isAggregate(this.lhs))
 			{
-				javaString += JAVA_EQUALS_TO;
+				this.lhs = this.lhs.substring(0,this.lhs.lastIndexOf('_'));
 			}
-			else if(tokens[i].equalsIgnoreCase("or"))
+			this.rhs = "";
+			for(int i = 0; i < tokens.length; i++)
 			{
-				javaString += JAVA_OR;
-			}
-			else if(tokens[i].equalsIgnoreCase("and"))
-			{
-				javaString += JAVA_AND;
-			}
-			else
-			{
-				if(InputParser.isAggregate(tokens[i]))
+				if(tokens[i].equals("="))
 				{
-					aggregateFunctions.add(tokens[i]);
+					tokens[i] = JAVA_EQUALS_TO;
 				}
+				else if(tokens[i].equalsIgnoreCase("or"))
+				{
+					tokens[i] = JAVA_OR;
+				}
+				else if(tokens[i].equalsIgnoreCase("and"))
+				{
+					tokens[i] = JAVA_AND;
+				}
+				else
+				{
+					if(InputParser.isAggregate(tokens[i]))
+					{
+						aggregateFunctions.add(tokens[i]);
+					}
+				}
+				
 				javaString += tokens[i];
+				
+				if(i > 0)
+				{
+					this.rhs += tokens[i];
+				}
 			}
 		}
 	}
