@@ -11,11 +11,13 @@ import java.util.ArrayList;
  * instead.
  ************************************/
 public class Condition {
-	private static final String JAVA_OR = "||";
-	private static final String JAVA_AND = "&&";
-	private static final String JAVA_EQUALS_TO = "==";
+	public static final String JAVA_OR = "||";
+	public static final String JAVA_AND = "&&";
+	public static final String JAVA_EQUALS_TO = "==";
+	public static final String JAVA_STRING_EQUALS = ".equals";
 	public ArrayList<String> aggregateFunctions;
 	public String lhs;
+	public String operator;
 	public String rhs;
 	private String javaString = "";
 	
@@ -31,11 +33,14 @@ public class Condition {
 				this.lhs = this.lhs.substring(0,this.lhs.lastIndexOf('_'));
 			}
 			this.rhs = "";
+			this.operator = "";
+			boolean isOperator = false;
 			for(int i = 0; i < tokens.length; i++)
 			{
 				if(tokens[i].equals("="))
 				{
 					tokens[i] = JAVA_EQUALS_TO;
+					isOperator = true;
 				}
 				else if(tokens[i].equalsIgnoreCase("or"))
 				{
@@ -44,6 +49,10 @@ public class Condition {
 				else if(tokens[i].equalsIgnoreCase("and"))
 				{
 					tokens[i] = JAVA_AND;
+				}
+				else if(tokens[i].contains("'"))
+				{
+					tokens[i] = tokens[i].replace("'", "\"");
 				}
 				else
 				{
@@ -55,7 +64,12 @@ public class Condition {
 				
 				javaString += tokens[i];
 				
-				if(i > 0)
+				if(isOperator)
+				{
+					this.operator = tokens[i];
+					isOperator = false;
+				}
+				else if(i > 0)
 				{
 					this.rhs += tokens[i];
 				}

@@ -18,8 +18,10 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -32,11 +34,9 @@ import com.sun.codemodel.JCodeModel;
 import com.sun.codemodel.JConditional;
 import com.sun.codemodel.JDefinedClass;
 import com.sun.codemodel.JExpr;
-import com.sun.codemodel.JForEach;
 import com.sun.codemodel.JMethod;
 import com.sun.codemodel.JMod;
 import com.sun.codemodel.JTryBlock;
-import com.sun.codemodel.JType;
 import com.sun.codemodel.JVar;
 
 
@@ -301,12 +301,6 @@ public class JavaWriter {
 		
 		//Build string for initializing mfstruct
 		String buildMFStruct = "mftable.put(" + key + ", new MFStruct(" + groupingAttrb;
-		String initAggregates = "";
-		for(int i = 0; i < parsed.getF().length; i++)
-		{
-			buildMFStruct += ",0";
-			initAggregates += "mftable.get(" + key + ")."+parsed.getF()[i]+"=";
-		}
 		buildMFStruct += "));";
 		
 		//Run mfstruct initialization if mftable doesn't have key yet
@@ -318,6 +312,23 @@ public class JavaWriter {
 		JBlock conditionBody = condition._then();
 		JBlock conditionElse = condition._else();
 		JBlock foreachLoop = conditionElse.forEach(codeModel.directClass("MFStruct"), "curStruct", JExpr.direct("mftable.values()")).body();
+		List<String> groupingAttr = Arrays.asList(this.parsed.getV());
+		String setNonAttrString = "curStruct.setNonGroupingAttrib(";
+		int index = 0;
+		for(int i = 0; i < mfdata.length; i++)
+		{
+			String[] column = mfdata[i];
+			if(!groupingAttr.contains(column[MF_NAME]))
+			{
+				if(index != 0)
+					setNonAttrString += ",";
+				setNonAttrString += column[MF_NAME];
+				index++;
+			}
+		}
+		setNonAttrString += ");";
+		if(index > 0)
+			foreachLoop.directStatement(setNonAttrString);
 		foreachLoop.directStatement("GroupingVariable curVariable = curStruct.groupVars[scan];");
 		JConditional suchThatConditions = null;
 		for(int i = 0; i < this.parsed.getN(); i++)
@@ -325,14 +336,34 @@ public class JavaWriter {
 			String suchThat = "scan == " + (i+1);
 			for(int j = 0; j < this.parsed.getSigma().get(i).size(); j++)
 			{
+				Condition curCondition = this.parsed.getSigma().get(i).get(j);
 				suchThat += " && ";
-				if(InputParser.isAggregate(this.parsed.getSigma().get(i).get(j).lhs))
+				if(InputParser.isAggregate(curCondition.lhs))
 				{
-					suchThat += "curVariable.get("+this.parsed.getSigma().get(i).get(j).lhs+")"+this.parsed.getSigma().get(i).get(j).rhs;
+					suchThat += "curVariable.get("+curCondition.lhs+")"+curCondition.rhs;
 				}
 				else
 				{
-					suchThat += "curStruct."+this.parsed.getSigma().get(i).get(j).lhs+this.parsed.getSigma().get(i).get(j).rhs;
+					String field = curCondition.lhs;
+					for(int k = 0; k < mfdata.length; k++)
+					{
+						if(mfdata[k][MF_NAME].equals(field))
+						{
+							if(curCondition.operator.equals(Condition.JAVA_EQUALS_TO) && getJavaType(mfdata[k][MF_TYPE]).equals("String"))
+								curCondition.operator = Condition.JAVA_STRING_EQUALS;
+							this.parsed.getSigma().get(i).set(j, curCondition);
+							break;
+						}
+					}
+					if(curCondition.operator.equals(Condition.JAVA_STRING_EQUALS))
+					{
+						suchThat += "curStruct."+curCondition.lhs+curCondition.operator+"("+curCondition.rhs+")";
+					}
+					else
+					{
+						suchThat += "curStruct."+curCondition.lhs+curCondition.operator+curCondition.rhs;
+					}
+					
 				}
 			}
 			if(i == 0)
@@ -371,6 +402,7 @@ public class JavaWriter {
 		generateMFStructProperties();
 		generateMFStructConstructor();
 		mfstructClass.direct(initStructTemplate);
+		generateMFStructNonGroupingAttrib();
 	}
 	
 	private void generateMFStructProperties() throws IOException, ClassNotFoundException
@@ -410,6 +442,26 @@ public class JavaWriter {
 		body.directStatement("initStruct();");
 	}
 	
+	private void generateMFStructNonGroupingAttrib() throws IOException, ClassNotFoundException
+	{
+		JMethod function = mfstructClass.method(JMod.PUBLIC, void.class, "setNonGroupingAttrib");
+		List<String> groupingAttr = Arrays.asList(parsed.getV());
+		for(int i = 0; i < mfdata.length; i++)
+		{
+			String[] column = mfdata[i];
+			if(!groupingAttr.contains(column[MF_NAME]))
+			{
+				function.param(codeModel.parseType(getJavaType(column[MF_TYPE])), column[MF_NAME]);
+			}
+		}
+		JBlock body = function.body();
+		for(int i = 0; i < function.params().size(); i++)
+		{
+			String name = function.params().get(i).name();
+			body.assign(JExpr._this().ref(mfstructClass.fields().get(name)), JExpr.ref(function.params().get(i).name()));
+		}
+	}
+	
 	private void generateOutputMethod()
 	{
 		//Generate method header
@@ -418,10 +470,38 @@ public class JavaWriter {
 		
 		for(int i = 0; i < this.parsed.getS().length; i++)
 		{
-			methodBody.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+3)+"s\", \"" + this.parsed.getS()[i] + "\");"); 
+			methodBody.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"s\", \"" + this.parsed.getS()[i] + "\");"); 
 		}
+		methodBody.directStatement("System.out.println();");
 		
 		JBlock foreachLoop = methodBody.forEach(codeModel.directClass("MFStruct"), "curStruct", JExpr.direct("mftable.values()")).body();
+		for(int i = 0; i < this.parsed.getS().length; i++)
+		{
+			String projected = this.parsed.getS()[i];
+			if(InputParser.isAggregate(projected))
+			{
+				if(InputParser.isCount(projected))
+				{
+					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct.groupVars[" + InputParser.getVarNum(projected) + "].count);");
+				}
+				else
+				{
+					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct.groupVars[" + InputParser.getVarNum(projected) + "].get(\""+projected+"\"));");
+				}
+			}
+			else
+			{
+				if(lookupType(projected).equals("String"))
+				{
+					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"s\", curStruct."+projected+");"); 
+				}
+				else
+				{
+					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct."+projected+");"); 
+				}
+			}
+		}
+		foreachLoop.directStatement("System.out.println();");
 	}
 	
 	private String getJavaType(String dbType)
@@ -436,6 +516,18 @@ public class JavaWriter {
 			default:
 				return null;
 		}
+	}
+	
+	private String lookupType(String name)
+	{
+		for(int i = 0; i < mfdata.length; i++)
+		{
+			if(mfdata[i][MF_NAME].equals(name))
+			{
+				return getJavaType(mfdata[i][MF_TYPE]);
+			}
+		}
+		return null;
 	}
 	
 	private String getResultSetType(String dbType)

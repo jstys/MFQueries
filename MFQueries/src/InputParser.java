@@ -120,32 +120,26 @@ public class InputParser {
 		}
 		for(int i = 0; i < split.length; i++)
 		{
-			int varNum = Integer.parseInt(split[i].split("_")[2]);
-			this.sigma.get(varNum).add(new Condition(split[i]));
+			String var = split[i];
+			int varNum = getVarNum(var);
+			
+			this.sigma.get(varNum).add(new Condition(var));
 		}
 	}
 	
 	public void setSigma(JSONArray strings)
 	{
-		this.sigma = new ArrayList<ArrayList<Condition>>(this.n);
-		for(int i = 0; i < this.n; i++)
+		this.sigma = new ArrayList<ArrayList<Condition>>(this.n+1);
+		for(int i = 0; i <= this.n; i++)
 		{
 			this.sigma.add(new ArrayList<Condition>());
 		}
 		for(int i = 0; i < strings.size(); i++)
 		{
-			int varNum;
 			String var = ((String)strings.get(i)).split(" ")[0];
-			if(isAggregate((String)strings.get(i)))
-			{
-				varNum = Integer.parseInt(var.split("_")[2]);
-			}
-			else
-			{
-				varNum = Integer.parseInt(var.split("_")[1]);
-			}
-			varNum--;
-			this.sigma.get(varNum).add(new Condition(((String)strings.get(i))));
+			int varNum = getVarNum(var);
+			
+			this.sigma.get(varNum).add(new Condition(var));
 		}
 	}
 	
@@ -233,9 +227,32 @@ public class InputParser {
 		String[] split = str.split("_");
 		if(split.length >= 2)
 		{
-			return split[0].equalsIgnoreCase("max") || split[0].equalsIgnoreCase("min") || split[0].equalsIgnoreCase("avg") || split[0].equalsIgnoreCase("sum");
+			return split[0].equalsIgnoreCase("max") || split[0].equalsIgnoreCase("min") || split[0].equalsIgnoreCase("avg") || split[0].equalsIgnoreCase("sum") || split[0].equalsIgnoreCase("count");
 		}
 		return false;
+	}
+	
+	public static boolean isGlobalCondition(String str)
+	{
+		String[] split = str.split("_");
+		return split.length < 2;
+	}
+	
+	public static boolean isCount(String str)
+	{
+		String[] split = str.split("_");
+		return split[0].equalsIgnoreCase("count");
+	}
+	
+	public static int getVarNum(String str)
+	{
+		String[] split = str.split("_");
+		if(split.length >= 2)
+		{
+			if(NumberUtils.isNumber(split[split.length-1]));
+				return Integer.parseInt(split[split.length-1]);
+		}
+		return 0;
 	}
 	
 	public static boolean isGroupAttrib(String str)
