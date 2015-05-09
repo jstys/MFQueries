@@ -1,8 +1,8 @@
 {
-	"projectedAttributes": ["cust","prod","avg_quant_1"],
-	"numGroupingVars": 3,
-	"groupingAttributes": ["cust", "prod"],
-	"aggregateFunctions": ["avg_quant_1"],
-	"sigmaConditions": ["avg_quant_1 > 0"],
-	"havingCondition": ""
+	"projectedAttributes": ["prod","month","count_1","count_2"],
+	"numGroupingVars": 2,
+	"groupingAttributes": ["prod","month"],
+	"aggregateFunctions": ["count_1","count_2","avg_quant"],
+	"sigmaConditions": ["year = 1997","month > 1","month < 12", "prod_1 = prod", "month_1 = month-1","quant_1 > avg_quant","prod_2 = prod","month_2 = month+1","quant_2 > avg_quant"],
+	"havingCondition": "count_1 > 0 and count_2 > 0"
 }

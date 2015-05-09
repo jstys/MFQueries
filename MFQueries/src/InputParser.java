@@ -359,7 +359,6 @@ public class InputParser {
 				aggregateFunctions.add(G.aggregateFunctions.get(i));
 			}
 		}
-		System.out.println(aggregateFunctions.size());
 	}
 	
 	/*****************************

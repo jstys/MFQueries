@@ -76,7 +76,14 @@ public class Condition {
 							//Add the aggregate function to the list
 							aggregateFunctions.add(tokens[i]);
 							//Replace the token with the Java source necessary to retrieve it from the grouping variable
-							tokens[i] = "curStruct.groupVars["+InputParser.getVarNum(tokens[i])+"].get(\""+tokens[i]+"\")";
+							if(InputParser.isCount(tokens[i]))
+							{
+								tokens[i] = "curStruct.groupVars["+InputParser.getVarNum(tokens[i])+"].count";
+							}
+							else
+							{
+								tokens[i] = "curStruct.groupVars["+InputParser.getVarNum(tokens[i])+"].get(\""+tokens[i]+"\")";
+							}
 						}
 					}
 					
