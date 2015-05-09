@@ -113,15 +113,15 @@ public class InputParser {
 	public void setSigma(String string)
 	{
 		String[] split = string.split("\n");
-		this.sigma = new ArrayList<ArrayList<Condition>>(this.n);
-		for(int i = 0; i < this.n; i++)
+		this.sigma = new ArrayList<ArrayList<Condition>>(this.n+1);
+		for(int i = 0; i < this.n+1; i++)
 		{
 			this.sigma.add(new ArrayList<Condition>());
 		}
 		for(int i = 0; i < split.length; i++)
 		{
 			String var = split[i];
-			int varNum = getVarNum(var);
+			int varNum = getVarNum(var.split(" ")[0]);
 			
 			this.sigma.get(varNum).add(new Condition(var));
 		}
@@ -130,14 +130,14 @@ public class InputParser {
 	public void setSigma(JSONArray strings)
 	{
 		this.sigma = new ArrayList<ArrayList<Condition>>(this.n+1);
-		for(int i = 0; i <= this.n; i++)
+		for(int i = 0; i <= this.n+1; i++)
 		{
 			this.sigma.add(new ArrayList<Condition>());
 		}
 		for(int i = 0; i < strings.size(); i++)
 		{
-			String var = ((String)strings.get(i)).split(" ")[0];
-			int varNum = getVarNum(var);
+			String var = (String)strings.get(i);
+			int varNum = getVarNum(var.split(" ")[0]);
 			
 			this.sigma.get(varNum).add(new Condition(var));
 		}

@@ -96,6 +96,7 @@ public void initGroupingVariable(GroupingVariable curVariable, HashMap<String, I
 
     public void aggregateGroupingVariable(GroupingVariable curVariable, HashMap<String, Integer> intVals)
     {
+    	curVariable.count++;
         for (Map.Entry<String, AtomicInteger> entry : curVariable.aggMap.entrySet()) 
         {
             String key = entry.getKey();

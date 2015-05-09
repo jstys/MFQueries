@@ -28,7 +28,7 @@ public class Condition {
 		if(!tokens[0].equals(""))
 		{
 			this.lhs = tokens[0];
-			if(!InputParser.isAggregate(this.lhs))
+			if(!InputParser.isAggregate(this.lhs) && this.lhs.contains("_"))
 			{
 				this.lhs = this.lhs.substring(0,this.lhs.lastIndexOf('_'));
 			}
@@ -59,6 +59,7 @@ public class Condition {
 					if(InputParser.isAggregate(tokens[i]))
 					{
 						aggregateFunctions.add(tokens[i]);
+						tokens[i] = "curStruct.groupVars["+0+"].get(\""+tokens[i]+"\")";
 					}
 				}
 				

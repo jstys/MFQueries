@@ -18,6 +18,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -50,6 +51,10 @@ public class JavaWriter {
 	private static final String DBTYPE_VARCHAR = "character varying";
 	private static final String DBTYPE_INTEGER = "integer";
 	
+	//Java data type strings
+	private static final String JAVA_STRING = "String";
+	private static final String JAVA_INT = "int";
+	
 	//SQL aggregate function strings
 	private static final String MAX_FUNCTION = "max";
 	private static final String MIN_FUNCTION = "min";
@@ -62,6 +67,7 @@ public class JavaWriter {
 	private static final int AGGREGATE_COLUMN = 1;
 	private static final int AGGREGATE_INDEX = 2;
 	
+	//Array indices of mfdata
 	private static final int MF_NAME = 0;
 	private static final int MF_TYPE = 1;
 	private static final int MF_POS = 2;
@@ -197,9 +203,9 @@ public class JavaWriter {
 		runnerClass.field(JMod.PRIVATE, AtomInt, "test");
 		runnerClass.field(JMod.PRIVATE, Hashmap, "mftable");
 		runnerClass.field(JMod.PRIVATE, Map, "maptest");
-		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType("String"), "usr").init(JExpr.lit("postgres"));
-		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType("String"), "pwd").init(JExpr.lit("anycolor92"));
-		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType("String"), "url").init(JExpr.lit("jdbc:postgresql://localhost:5432/postgres"));
+		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType(JAVA_STRING), "usr").init(JExpr.lit("postgres"));
+		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType(JAVA_STRING), "pwd").init(JExpr.lit("anycolor92"));
+		runnerClass.field(JMod.PRIVATE+JMod.STATIC+JMod.FINAL, codeModel.parseType(JAVA_STRING), "url").init(JExpr.lit("jdbc:postgresql://localhost:5432/postgres"));
 		
 		JMethod construct = runnerClass.constructor(JMod.PUBLIC);
 		construct.body().directStatement("mftable = new HashMap<String,MFStruct>();");
@@ -270,7 +276,7 @@ public class JavaWriter {
         	String type = ((Pair<String,Integer>)entry.getValue()).getValue0();
         	int index = ((Pair<String,Integer>)entry.getValue()).getValue1().intValue();
         	whileBody.directStatement(getJavaType(type) + " " + name + " = rs." + getResultSetType(type) + "("+index+");");
-        	if(getJavaType(type).equals("int"))
+        	if(getJavaType(type).equals(JAVA_INT))
         	{
         		whileBody.directStatement("intVals.put(\""+name+"\","+name+");");
         	}
@@ -331,12 +337,15 @@ public class JavaWriter {
 			foreachLoop.directStatement(setNonAttrString);
 		foreachLoop.directStatement("GroupingVariable curVariable = curStruct.groupVars[scan];");
 		JConditional suchThatConditions = null;
-		for(int i = 0; i < this.parsed.getN(); i++)
+		for(int i = 1; i <= this.parsed.getN(); i++)
 		{
-			String suchThat = "scan == " + (i+1);
-			for(int j = 0; j < this.parsed.getSigma().get(i).size(); j++)
+			String suchThat = "scan == " + i;
+			ArrayList<Condition> sigmas = new ArrayList<Condition>();
+			sigmas.addAll(this.parsed.getSigma().get(0));
+			sigmas.addAll(this.parsed.getSigma().get(i));
+			for(int j = 0; j < sigmas.size(); j++)
 			{
-				Condition curCondition = this.parsed.getSigma().get(i).get(j);
+				Condition curCondition = sigmas.get(j);
 				suchThat += " && ";
 				if(InputParser.isAggregate(curCondition.lhs))
 				{
@@ -349,9 +358,9 @@ public class JavaWriter {
 					{
 						if(mfdata[k][MF_NAME].equals(field))
 						{
-							if(curCondition.operator.equals(Condition.JAVA_EQUALS_TO) && getJavaType(mfdata[k][MF_TYPE]).equals("String"))
+							if(curCondition.operator.equals(Condition.JAVA_EQUALS_TO) && getJavaType(mfdata[k][MF_TYPE]).equals(JAVA_STRING))
 								curCondition.operator = Condition.JAVA_STRING_EQUALS;
-							this.parsed.getSigma().get(i).set(j, curCondition);
+							sigmas.set(j, curCondition);
 							break;
 						}
 					}
@@ -366,7 +375,7 @@ public class JavaWriter {
 					
 				}
 			}
-			if(i == 0)
+			if(i == 1)
 			{
 				suchThatConditions = foreachLoop._if(JExpr.direct(suchThat));
 				JBlock suchThatBody = suchThatConditions._then();
@@ -380,7 +389,36 @@ public class JavaWriter {
 		}
 		conditionBody.directStatement("MFStruct curStruct = mftable.get("+key+");");
 		conditionBody.directStatement("GroupingVariable curVariable = curStruct.groupVars[0];");
-		conditionBody.directStatement("aggregateGroupingVariable(curVariable, intVals);");
+		String suchThat0 = "";
+		for(int i = 0; i < this.parsed.getSigma().get(0).size(); i++)
+		{
+			if(!suchThat0.equals(""))
+			{
+				suchThat0 += " && ";
+			}
+			Condition curCondition = this.parsed.getSigma().get(0).get(i);
+			String field = curCondition.lhs;
+			for(int k = 0; k < mfdata.length; k++)
+			{
+				if(mfdata[k][MF_NAME].equals(field))
+				{
+					if(curCondition.operator.equals(Condition.JAVA_EQUALS_TO) && getJavaType(mfdata[k][MF_TYPE]).equals(JAVA_STRING))
+						curCondition.operator = Condition.JAVA_STRING_EQUALS;
+					this.parsed.getSigma().get(0).set(i, curCondition);
+					break;
+				}
+			}
+			if(curCondition.operator.equals(Condition.JAVA_STRING_EQUALS))
+			{
+				suchThat0 += "curStruct."+curCondition.lhs+curCondition.operator+"("+curCondition.rhs+")";
+			}
+			else
+			{
+				suchThat0 += "curStruct."+curCondition.lhs+curCondition.operator+curCondition.rhs;
+			}
+		}
+		JBlock scan0Body = conditionBody._if(JExpr.direct(suchThat0))._then();
+		scan0Body.directStatement("aggregateGroupingVariable(curVariable, intVals);");
 		
 		whileBody.directStatement("more = rs.next();");
 		whileBody.directStatement("if(!more)");
@@ -491,7 +529,7 @@ public class JavaWriter {
 			}
 			else
 			{
-				if(lookupType(projected).equals("String"))
+				if(lookupType(projected).equals(JAVA_STRING))
 				{
 					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"s\", curStruct."+projected+");"); 
 				}
@@ -510,9 +548,9 @@ public class JavaWriter {
 		{
 			case DBTYPE_VARCHAR:
 			case DBTYPE_CHARACTER:
-				return "String";
+				return JAVA_STRING;
 			case DBTYPE_INTEGER:
-				return "int";
+				return JAVA_INT;
 			default:
 				return null;
 		}
