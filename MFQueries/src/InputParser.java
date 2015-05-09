@@ -17,15 +17,26 @@ import org.json.simple.JSONArray;
  ************************************/
 public class InputParser {
 	
-	private String[] S;			//Projected attributes
-	private int n;				//Number of grouping variables
-	private String[] V;			//Grouping attributes
-	private String[] F;			//Array of aggregate functions
-	private ArrayList<ArrayList<Condition>> sigma;	//Selection conditions on grouped tuples
-	private Condition G;		//Having condition
-	private ArrayList<String> aggregateFunctions;
-	private ArrayList<String> groupAttribs;
+	//SQL aggregate function strings
+	private static final String MAX_FUNCTION = "max";
+	private static final String MIN_FUNCTION = "min";
+	private static final String AVG_FUNCTION = "avg";
+	private static final String SUM_FUNCTION = "sum";
+	private static final String COUNT_FUNCTION = "count";
 	
+	public static final String NAME_SEPARATOR = "_";
+	
+	private String[] S;									//Projected attributes
+	private int n;										//Number of grouping variables
+	private String[] V;									//Grouping attributes
+	private String[] F;									//Array of aggregate functions
+	private ArrayList<ArrayList<Condition>> sigma;		//Selection conditions on grouped tuples
+	private Condition G;								//Having condition
+	private ArrayList<String> aggregateFunctions;		//Comprehensive collection of aggregate functions appearing in query
+	
+	/*****************************
+	 * DEFAULT CONSTRUCTOR
+	 *****************************/
 	public InputParser()
 	{
 		aggregateFunctions = new ArrayList<String>();
@@ -70,7 +81,7 @@ public class InputParser {
 	}
 	
 	/*****************************
-	 * MUTATOR METHODS
+	 * MUTATOR METHODS (overloaded for commandline input or JSON)
 	 *****************************/
 	public void setS(String string)
 	{
@@ -145,6 +156,8 @@ public class InputParser {
 	
 	public void setG(String string)
 	{
+		if(string.equals(""))
+			string = "true";
 		this.G = new Condition(string);
 	}
 	
@@ -178,6 +191,19 @@ public class InputParser {
 		return result;
 	}
 	
+	/*****************************
+	 * arrayListToString
+	 * 
+	 * Helper function for printing out array contents.
+	 * 
+	 * @param arr the ArrayList that is being
+	 * converted to a string
+	 * @param name the name of the field that 
+	 * is stored in arr
+	 * 
+	 * @return a string representation of the
+	 * arr param
+	 *****************************/
 	public String arrayListToString(ArrayList<String> arr, String name)
 	{
 		String result = "";
@@ -222,49 +248,81 @@ public class InputParser {
 		return result;
 	}
 	
+	/*****************************
+	 * isAggregate
+	 * 
+	 * @param str the string being tested
+	 * for aggregate function keyword.
+	 * 
+	 * @return true if the string contains
+	 * an aggregate keyword, false otherwise
+	 *****************************/
 	public static boolean isAggregate(String str)
 	{
-		String[] split = str.split("_");
+		String[] split = str.split(NAME_SEPARATOR);
 		if(split.length >= 2)
 		{
-			return split[0].equalsIgnoreCase("max") || split[0].equalsIgnoreCase("min") || split[0].equalsIgnoreCase("avg") || split[0].equalsIgnoreCase("sum") || split[0].equalsIgnoreCase("count");
+			return split[0].equalsIgnoreCase(MAX_FUNCTION) || split[0].equalsIgnoreCase(MIN_FUNCTION) || split[0].equalsIgnoreCase(AVG_FUNCTION) || split[0].equalsIgnoreCase(SUM_FUNCTION) || split[0].equalsIgnoreCase(COUNT_FUNCTION);
 		}
 		return false;
 	}
 	
+	/*****************************
+	 * isGlobalCondition
+	 * 
+	 * @param str the string being tested
+	 * for belonging to the 0th grouping variable.
+	 * 
+	 * @return true if the string is a 
+	 * condition on the 0th grouping variable.
+	 *****************************/
 	public static boolean isGlobalCondition(String str)
 	{
-		String[] split = str.split("_");
+		String[] split = str.split(NAME_SEPARATOR);
 		return split.length < 2;
 	}
 	
+	/*****************************
+	 * isGlobalCondition
+	 * 
+	 * @param str the string being tested
+	 * for belonging to the 0th grouping variable.
+	 * 
+	 * @return true if the string is a 
+	 * condition on the 0th grouping variable.
+	 *****************************/
 	public static boolean isCount(String str)
 	{
-		String[] split = str.split("_");
-		return split[0].equalsIgnoreCase("count");
+		String[] split = str.split(NAME_SEPARATOR);
+		return split[0].equalsIgnoreCase(COUNT_FUNCTION);
 	}
 	
+	/*****************************
+	 * getVarNum
+	 * 
+	 * @param str the string to extract
+	 * the grouping variable number from
+	 * 
+	 * @return an integer representing the grouping
+	 * variable number.
+	 *****************************/
 	public static int getVarNum(String str)
 	{
-		String[] split = str.split("_");
+		String[] split = str.split(NAME_SEPARATOR);
 		if(split.length >= 2)
 		{
-			if(NumberUtils.isNumber(split[split.length-1]));
+			if(NumberUtils.isNumber(split[split.length-1]))
 				return Integer.parseInt(split[split.length-1]);
 		}
 		return 0;
 	}
 	
-	public static boolean isGroupAttrib(String str)
-	{
-		String[] split = str.split("_");
-		if(split.length >= 2)
-		{
-			return NumberUtils.isNumber(split[split.length-1]);
-		}
-		return false;
-	}
-	
+	/*****************************
+	 * findAggregates
+	 * 
+	 * Finds all aggregates in any of the input fields
+	 * and adds them to the aggregateFunctions arrayList.
+	 *****************************/
 	public void findAggregates()
 	{
 		for(int i = 0; i < this.S.length; i++)
@@ -304,6 +362,13 @@ public class InputParser {
 		System.out.println(aggregateFunctions.size());
 	}
 	
+	/*****************************
+	 * jsonArrayToArray
+	 * 
+	 * @param arr the array whose elements originate
+	 * in the JSONArray
+	 * @param json the json array being converted
+	 *****************************/
 	private void jsonArrayToArray(String[] arr, JSONArray json)
 	{
 		for(int i = 0; i < json.size(); i++)

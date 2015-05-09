@@ -55,29 +55,12 @@ public class JavaWriter {
 	private static final String JAVA_STRING = "String";
 	private static final String JAVA_INT = "int";
 	
-	//SQL aggregate function strings
-	private static final String MAX_FUNCTION = "max";
-	private static final String MIN_FUNCTION = "min";
-	private static final String AVG_FUNCTION = "avg";
-	private static final String SUM_FUNCTION = "sum";
-	private static final String COUNT_FUNCTION = "count";
-	
-	//Positions of data in aggregate variable names i.e. max_quant_1
-	private static final int AGGREGATE_FUNCTION = 0;
-	private static final int AGGREGATE_COLUMN = 1;
-	private static final int AGGREGATE_INDEX = 2;
-	
 	//Array indices of mfdata
 	private static final int MF_NAME = 0;
 	private static final int MF_TYPE = 1;
 	private static final int MF_POS = 2;
 	
-	private InputParser parsed;
-	private DBConnector dbconnector;
-	private String[][] mfdata;
-	private JCodeModel codeModel;
-	private JDefinedClass runnerClass;
-	private JDefinedClass mfstructClass;
+	//Strings to hold templated code
 	private String mainTemplate;
 	private String connectTemplate;
 	private String retrieveTemplate1;
@@ -85,7 +68,13 @@ public class JavaWriter {
 	private String groupVarClassTemplate;
 	private String initStructTemplate;
 	private String mainFunctionsTemplate;
-	private String scan0Template;
+	
+	private InputParser parsed;
+	private DBConnector dbconnector;
+	private String[][] mfdata;
+	private JCodeModel codeModel;
+	private JDefinedClass runnerClass;
+	private JDefinedClass mfstructClass;
 	
 	public JavaWriter(InputParser parsed)
 	{
@@ -132,9 +121,6 @@ public class JavaWriter {
 					case "GROUPVARFCNS_START":
 						input.nextLine();
 						mainFunctionsTemplate = readTemplate("GROUPVARFCNS_END", input);
-					case "SCAN0_START":
-						input.nextLine();
-						scan0Template = readTemplate("SCAN0_END", input);
 						
 				}
 				line = input.nextLine();
@@ -245,8 +231,8 @@ public class JavaWriter {
 		tryBody.decl(resultSetClass, "rs");
 		tryBody.decl(statementClass, "st", con.invoke("createStatement").arg(JExpr.direct("ResultSet.TYPE_SCROLL_SENSITIVE")).arg(JExpr.direct("ResultSet.CONCUR_READ_ONLY")));
 		tryBody.directStatement(retrieveTemplate1);
-		JVar numScans = tryBody.decl(codeModel.INT, "numScans", JExpr.direct(""+(parsed.getN()+1)));
-		JVar scan = tryBody.decl(codeModel.INT, "scan", JExpr.direct("0"));
+		tryBody.decl(codeModel.INT, "numScans", JExpr.direct(""+(parsed.getN()+1)));
+		tryBody.decl(codeModel.INT, "scan", JExpr.direct("0"));
 		String aggArray = "String [] aggregates = {";
 		for(int i = 0; i < this.parsed.getAggregateFunctions().size(); i++)
 		{
@@ -513,6 +499,8 @@ public class JavaWriter {
 		methodBody.directStatement("System.out.println();");
 		
 		JBlock foreachLoop = methodBody.forEach(codeModel.directClass("MFStruct"), "curStruct", JExpr.direct("mftable.values()")).body();
+		System.out.println(this.parsed.getG().getJavaString());
+		JBlock havingBody = foreachLoop._if(JExpr.direct(this.parsed.getG().getJavaString()))._then();
 		for(int i = 0; i < this.parsed.getS().length; i++)
 		{
 			String projected = this.parsed.getS()[i];
@@ -520,26 +508,26 @@ public class JavaWriter {
 			{
 				if(InputParser.isCount(projected))
 				{
-					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct.groupVars[" + InputParser.getVarNum(projected) + "].count);");
+					havingBody.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct.groupVars[" + InputParser.getVarNum(projected) + "].count);");
 				}
 				else
 				{
-					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct.groupVars[" + InputParser.getVarNum(projected) + "].get(\""+projected+"\"));");
+					havingBody.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct.groupVars[" + InputParser.getVarNum(projected) + "].get(\""+projected+"\"));");
 				}
 			}
 			else
 			{
 				if(lookupType(projected).equals(JAVA_STRING))
 				{
-					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"s\", curStruct."+projected+");"); 
+					havingBody.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"s\", curStruct."+projected+");"); 
 				}
 				else
 				{
-					foreachLoop.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct."+projected+");"); 
+					havingBody.directStatement("System.out.printf(\"%-"+(this.parsed.getS()[i].length()+10)+"d\", curStruct."+projected+");"); 
 				}
 			}
 		}
-		foreachLoop.directStatement("System.out.println();");
+		havingBody.directStatement("System.out.println();");
 	}
 	
 	private String getJavaType(String dbType)

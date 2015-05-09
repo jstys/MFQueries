@@ -35,7 +35,8 @@ public class MFQueryGenerator {
 	{
 		JSONParser parser = new JSONParser();
 		inputParser = new InputParser();
-		if(args.length > 0)
+		
+		if(args.length > 0) //JSON input file case
 		{
 			try {
  
@@ -56,7 +57,7 @@ public class MFQueryGenerator {
 	            e.printStackTrace();
 	        }
 		}
-		else
+		else //User commandline input case
 		{
 			getUserInput();
 		}
